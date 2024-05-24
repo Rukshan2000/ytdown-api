@@ -5,18 +5,7 @@ const ytdl = require('ytdl-core');
 const app = express();
 const port = 4000;
 
-const allowedOrigins = ['https://www.rukshantharindu.link'];
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
-  }
-}));
+app.use(cors());
 
 const sanitizeFilename = (filename) => {
   return filename.replace(/[^a-z0-9_\-]/gi, '_');
@@ -25,6 +14,7 @@ const sanitizeFilename = (filename) => {
 app.get('/download', async (req, res) => {
   const videoURL = req.query.url;
   const format = req.query.format || 'mp4'; // Default to mp4
+  const quality = req.query.quality || 'highest'; // Default to highest quality
 
   if (!videoURL) {
     console.error('URL is required');
@@ -36,10 +26,9 @@ app.get('/download', async (req, res) => {
     const info = await ytdl.getInfo(videoURL);
     let chosenFormat;
     if (format === 'mp3') {
-      // Always choose the highest quality audio format
-      chosenFormat = ytdl.chooseFormat(info.formats, { filter: 'audioonly', quality: 'highestaudio' });
+      chosenFormat = ytdl.chooseFormat(info.formats, { filter: 'audioonly', quality });
     } else {
-      chosenFormat = ytdl.chooseFormat(info.formats, { filter: 'videoandaudio', quality: 'highest', container: 'mp4' });
+      chosenFormat = ytdl.chooseFormat(info.formats, { filter: 'videoandaudio', quality, container: 'mp4' });
     }
     const sanitizedFilename = sanitizeFilename(info.videoDetails.title);
 
