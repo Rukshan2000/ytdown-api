@@ -1,70 +1,58 @@
-const express = require('express');
-const cors = require('cors');
-const ytdl = require('ytdl-core');
+import React, { useState } from 'react';
+import axios from 'axios';
 
-const app = express();
-const port = 4000;
+const Downloader = () => {
+  const [videoUrl, setVideoUrl] = useState('');
+  const [format, setFormat] = useState('mp4'); // Default to mp4
+  const [error, setError] = useState('');
+  const [downloading, setDownloading] = useState(false);
 
-app.use(cors());
+  const handleDownload = async () => {
+    setError('');
+    setDownloading(true);
+    try {
+      const response = await axios.get(`https://ytdown-api.vercel.app/download?url=${encodeURIComponent(videoUrl)}&format=${format}&quality=medium`, {
+        responseType: 'blob',
+      });
 
-const sanitizeFilename = (filename) => {
-  return filename.replace(/[^a-z0-9_\-]/gi, '_');
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `video.${format}`);
+      document.body.appendChild(link);
+      link.click();
+    } catch (err) {
+      setError('Error downloading video');
+      console.error('Error downloading video:', err);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <div className="p-4">
+      <h1 className="mb-4 text-2xl">YouTube Video Downloader</h1>
+      <input
+        type="text"
+        value={videoUrl}
+        onChange={(e) => setVideoUrl(e.target.value)}
+        placeholder="Enter YouTube video URL"
+        className="w-full p-2 mb-4 border"
+      />
+      <div className="mb-4">
+        <label className="mr-2">Format:</label>
+        <select value={format} onChange={(e) => setFormat(e.target.value)} className="p-2 border">
+          <option value="mp4">Video</option>
+          <option value="mp3">Audio</option>
+        </select>
+      </div>
+      <button onClick={handleDownload} className="px-4 py-2 text-white bg-blue-500 rounded">
+        Download Video
+      </button>
+      {downloading && <p className="mt-4 text-blue-500">Downloading your video, please wait...</p>}
+      {error && <p className="mt-4 text-red-500">{error}</p>}
+    </div>
+  );
 };
 
-app.get('/download', async (req, res) => {
-  const videoURL = req.query.url;
-  const format = req.query.format || 'mp4'; // Default to mp4
-  const videoQuality = 'lowest'; // Set to lowest video quality
-  const audioQuality = req.query.audioQuality || 'highest'; // Default to highest audio quality
-
-  if (!videoURL) {
-    console.error('URL is required');
-    return res.status(400).send('URL is required');
-  }
-
-  try {
-    console.log(`Fetching video info for URL: ${videoURL}`);
-    const info = await ytdl.getInfo(videoURL);
-    const videoFormat = ytdl.chooseFormat(info.formats, { filter: 'videoonly', quality: videoQuality });
-    const audioFormat = ytdl.chooseFormat(info.formats, { filter: 'audioonly', quality: audioQuality });
-
-    const sanitizedFilename = sanitizeFilename(info.videoDetails.title);
-
-    res.setHeader('Content-Disposition', `attachment; filename="${sanitizedFilename}.${format}"`);
-    res.setHeader('Content-Type', format === 'mp3' ? 'audio/mpeg' : 'video/mp4');
-
-    const videoStream = ytdl(videoURL, { format: videoFormat });
-    const audioStream = ytdl(videoURL, { format: audioFormat });
-
-    videoStream.on('error', (err) => {
-      console.error('Error during download:', err);
-      res.status(500).send('Error downloading video');
-    });
-
-    audioStream.on('error', (err) => {
-      console.error('Error during download:', err);
-      res.status(500).send('Error downloading audio');
-    });
-
-    videoStream.pipe(res, { end: false });
-    audioStream.pipe(res, { end: false });
-
-    videoStream.on('end', () => {
-      console.log('Video stream ended');
-      audioStream.end();
-    });
-
-    audioStream.on('end', () => {
-      console.log('Audio stream ended');
-      res.end();
-    });
-
-  } catch (error) {
-    console.error('Error fetching video info:', error);
-    res.status(500).send('Error downloading video');
-  }
-});
-
-app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
-});
+export default Downloader;
