@@ -14,7 +14,7 @@ const sanitizeFilename = (filename) => {
 app.get('/download', async (req, res) => {
   const videoURL = req.query.url;
   const format = req.query.format || 'mp4'; // Default to mp4
-  const videoQuality = req.query.videoQuality || 'lowest'; // Default to lowest video quality
+  const videoQuality = 'lowest'; // Set to lowest video quality
   const audioQuality = req.query.audioQuality || 'highest'; // Default to highest audio quality
 
   if (!videoURL) {
@@ -25,8 +25,8 @@ app.get('/download', async (req, res) => {
   try {
     console.log(`Fetching video info for URL: ${videoURL}`);
     const info = await ytdl.getInfo(videoURL);
-    let videoFormat = ytdl.chooseFormat(info.formats, { filter: format === 'mp3' ? 'audioonly' : 'videoonly', quality: videoQuality });
-    let audioFormat = ytdl.chooseFormat(info.formats, { filter: 'audioonly', quality: audioQuality });
+    const videoFormat = ytdl.chooseFormat(info.formats, { filter: 'videoonly', quality: videoQuality });
+    const audioFormat = ytdl.chooseFormat(info.formats, { filter: 'audioonly', quality: audioQuality });
 
     const sanitizedFilename = sanitizeFilename(info.videoDetails.title);
 
