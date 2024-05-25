@@ -14,7 +14,8 @@ const sanitizeFilename = (filename) => {
 app.get('/download', async (req, res) => {
   const videoURL = req.query.url;
   const format = req.query.format || 'mp4'; // Default to mp4
-  const quality = req.query.quality || 'highest'; // Default to highest quality
+  const videoQuality = req.query.videoQuality || 'lowest'; // Default to lowest video quality
+  const audioQuality = req.query.audioQuality || 'highest'; // Default to highest audio quality
 
   if (!videoURL) {
     console.error('URL is required');
@@ -24,29 +25,38 @@ app.get('/download', async (req, res) => {
   try {
     console.log(`Fetching video info for URL: ${videoURL}`);
     const info = await ytdl.getInfo(videoURL);
-    let chosenFormat;
-    if (format === 'mp3') {
-      chosenFormat = ytdl.chooseFormat(info.formats, { filter: 'audioonly', quality });
-    } else {
-      chosenFormat = ytdl.chooseFormat(info.formats, { filter: 'videoandaudio', quality, container: 'mp4' });
-    }
+    let videoFormat = ytdl.chooseFormat(info.formats, { filter: format === 'mp3' ? 'audioonly' : 'videoonly', quality: videoQuality });
+    let audioFormat = ytdl.chooseFormat(info.formats, { filter: 'audioonly', quality: audioQuality });
+
     const sanitizedFilename = sanitizeFilename(info.videoDetails.title);
 
     res.setHeader('Content-Disposition', `attachment; filename="${sanitizedFilename}.${format}"`);
     res.setHeader('Content-Type', format === 'mp3' ? 'audio/mpeg' : 'video/mp4');
 
-    const videoStream = ytdl(videoURL, { format: chosenFormat });
+    const videoStream = ytdl(videoURL, { format: videoFormat });
+    const audioStream = ytdl(videoURL, { format: audioFormat });
 
     videoStream.on('error', (err) => {
       console.error('Error during download:', err);
       res.status(500).send('Error downloading video');
     });
 
-    videoStream.pipe(res).on('finish', () => {
-      console.log('Download complete');
-    }).on('error', (err) => {
-      console.error('Error piping video stream:', err);
-      res.status(500).send('Error downloading video');
+    audioStream.on('error', (err) => {
+      console.error('Error during download:', err);
+      res.status(500).send('Error downloading audio');
+    });
+
+    videoStream.pipe(res, { end: false });
+    audioStream.pipe(res, { end: false });
+
+    videoStream.on('end', () => {
+      console.log('Video stream ended');
+      audioStream.end();
+    });
+
+    audioStream.on('end', () => {
+      console.log('Audio stream ended');
+      res.end();
     });
 
   } catch (error) {
